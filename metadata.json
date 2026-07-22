@@ -1,0 +1,6 @@
+{
+  "name": "MongoDB Blog CMS & Query Lab",
+  "description": "Hệ thống quản lý nội dung blog và bài viết tối ưu hóa bằng NoSQL MongoDB và tích hợp Trợ lý Viết bài Gemini AI.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
