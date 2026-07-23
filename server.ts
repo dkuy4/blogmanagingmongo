@@ -20,43 +20,60 @@ const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017";
 const dbName = "mongodb_blog_cms";
 let mongoClient: MongoClient | null = null;
 let isMongoConnected = false;
+let mongoConnectPromise: Promise<void> | null = null;
 
 async function connectToMongo() {
-  try {
-    mongoClient = new MongoClient(mongoUri, {
-      connectTimeoutMS: 5000,
-      serverSelectionTimeoutMS: 5000
-    });
-    await mongoClient.connect();
-    isMongoConnected = true;
-    console.log(`[MongoDB] Connected successfully to ${mongoUri}`);
-    
-    const db = mongoClient.db(dbName);
-    const collection = db.collection("Posts");
-    
-    // Create text index for full-text search
-    await collection.createIndex(
-      { title: "text", content: "text", excerpt: "text" },
-      { weights: { title: 10, excerpt: 3, content: 1 }, name: "TextIndex" }
-    );
-    console.log("[MongoDB] Text index checked/created on Posts collection");
+  if (isMongoConnected && mongoClient) return;
+  if (!mongoConnectPromise) {
+    mongoConnectPromise = (async () => {
+      try {
+        if (!mongoClient) {
+          mongoClient = new MongoClient(mongoUri, {
+            connectTimeoutMS: 5000,
+            serverSelectionTimeoutMS: 5000
+          });
+        }
+        await mongoClient.connect();
+        isMongoConnected = true;
+        console.log(`[MongoDB] Connected successfully to ${mongoUri}`);
+        
+        const db = mongoClient.db(dbName);
+        const collection = db.collection("Posts");
+        
+        // Create text index for full-text search
+        await collection.createIndex(
+          { title: "text", content: "text", excerpt: "text" },
+          { weights: { title: 10, excerpt: 3, content: 1 }, name: "TextIndex" }
+        ).catch(() => {});
 
-    // Initialize database if empty
-    const count = await collection.countDocuments();
-    if (count === 0) {
-      console.log("[MongoDB] Posts collection is empty. Populating with 52 mock posts...");
-      const mockPosts = getMockPosts();
-      await collection.insertMany(mockPosts as any);
-      console.log(`[MongoDB] Successfully populated database with ${mockPosts.length} mock posts.`);
-    }
-  } catch (error) {
-    isMongoConnected = false;
-    console.error("[MongoDB] Failed to connect to MongoDB:", error);
-    console.log("[MongoDB] Running server in Simulated Fallback Mode (in-memory).");
+        // Initialize database if empty
+        const count = await collection.countDocuments();
+        if (count === 0) {
+          console.log("[MongoDB] Posts collection is empty. Populating with 52 mock posts...");
+          const mockPosts = getMockPosts();
+          await collection.insertMany(mockPosts as any);
+          console.log(`[MongoDB] Successfully populated database with ${mockPosts.length} mock posts.`);
+        }
+      } catch (error) {
+        isMongoConnected = false;
+        mongoConnectPromise = null;
+        console.error("[MongoDB] Failed to connect to MongoDB:", error);
+        console.log("[MongoDB] Running server in Simulated Fallback Mode (in-memory).");
+      }
+    })();
   }
+  await mongoConnectPromise;
 }
 
 connectToMongo();
+
+// Middleware to ensure DB connection is attempted before handling API requests
+app.use(async (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    await connectToMongo();
+  }
+  next();
+});
 
 // ==========================================
 // IN-MEMORY FALLBACK (if MongoDB is offline)
@@ -768,13 +785,13 @@ Hãy trả về kết quả dưới dạng JSON có cấu trúc chính xác sau:
 
 // Serve frontend with Vite middleware
 async function setupServer() {
-  if (process.env.NODE_ENV !== "production") {
+  if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
-  } else {
+  } else if (!process.env.VERCEL) {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
@@ -782,9 +799,13 @@ async function setupServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (!process.env.VERCEL) {
+    app.listen(PORT, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
 setupServer();
+
+export default app;
