@@ -8,7 +8,8 @@ import {
   Database, BookOpen, Terminal, Settings, Search, Sparkles, Trash2, 
   BarChart3, PlusCircle, RefreshCw, Compass, ThumbsUp, Share2, 
   MessageSquare, Calendar, User, Tag, ChevronRight, Info, FileText, 
-  CheckCircle, AlertCircle, GitCompare, X, Send, Eye, ShieldAlert, ArrowRight
+  CheckCircle, AlertCircle, GitCompare, X, Send, Eye, ShieldAlert, ArrowRight,
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { 
   loadPostsFromStorage, resetDatabase, loadLogsFromStorage, 
@@ -25,6 +26,7 @@ export default function App() {
   const [logs, setLogs] = useState<QueryLog[]>([]);
   const [selectedPost, setSelectedPost] = useState<PostDocument | null>(null);
   const [dbStatus, setDbStatus] = useState<{ connected: boolean, database: string, uri: string }>({ connected: false, database: '', uri: '' });
+  const [isLogsMinimized, setIsLogsMinimized] = useState<boolean>(false);
   
   // Navigation
   const [activeTab, setActiveTab] = useState<'reader' | 'admin' | 'queryLab' | 'docs'>('reader');
@@ -434,7 +436,7 @@ export default function App() {
 
       {/* TOAST SYSTEM */}
       {toastMessage && (
-        <div className="fixed bottom-24 right-4 z-50 animate-bounce max-w-md bg-slate-900 text-white border border-emerald-500 rounded-xl shadow-2xl p-4 flex items-center gap-3">
+        <div className={`fixed ${isLogsMinimized ? 'bottom-12' : 'bottom-28'} right-4 z-50 animate-bounce max-w-md bg-slate-900 text-white border border-emerald-500 rounded-xl shadow-2xl p-4 flex items-center gap-3 transition-all duration-200`}>
           <div className="p-1.5 bg-emerald-500 rounded-full text-white">
             <CheckCircle className="w-5 h-5" />
           </div>
@@ -1547,48 +1549,79 @@ ${selectedPost.recent_comments.length > 2 ? `    ... // Thêm ${selectedPost.rec
       </main>
 
       {/* FLOATING LIVE MONGO TERMINAL LOGS */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-slate-950 text-emerald-400 border-t border-emerald-500/30 z-30 shadow-2xl">
-        <div className="max-w-7xl mx-auto px-4 py-2">
+      <footer className="fixed bottom-0 left-0 right-0 bg-slate-950 text-emerald-400 border-t border-emerald-500/30 z-30 shadow-2xl transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 py-1.5">
           
           {/* Header click bar to toggle */}
-          <div className="flex items-center justify-between py-1 border-b border-slate-900 text-xs">
+          <div 
+            onClick={() => setIsLogsMinimized(!isLogsMinimized)}
+            className="flex items-center justify-between py-1 border-b border-slate-900 text-xs cursor-pointer select-none group"
+          >
             <div className="flex items-center gap-2 font-mono">
-              <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping shrink-0" />
-              <span className="font-bold text-white uppercase tracking-wider">Live MongoDB Shell Console (Real-time logs)</span>
+              <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isLogsMinimized ? 'bg-slate-500' : 'bg-emerald-500 animate-ping'}`} />
+              <span className="font-bold text-white uppercase tracking-wider group-hover:text-emerald-400 transition-colors">
+                Live MongoDB Shell Console (Real-time logs)
+              </span>
+              <span className="px-1.5 py-0.2 bg-emerald-950 text-emerald-400 border border-emerald-500/30 rounded-full text-[9px] font-mono">
+                {logs.length} logs
+              </span>
             </div>
             
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] text-slate-500 font-mono">Ghi lại các lệnh Mongo shell thực thi dưới nền</span>
+            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+              <span className="hidden sm:inline text-[10px] text-slate-500 font-mono">
+                {isLogsMinimized ? 'Bấm để mở rộng console' : 'Ghi lại các lệnh Mongo shell thực thi dưới nền'}
+              </span>
+              
               <button 
                 onClick={() => { clearLogs(); setLogs([]); showToast("Đã dọn dẹp bảng điều khiển log shell!", "info"); }}
                 className="text-slate-400 hover:text-white transition text-[10px] font-bold bg-slate-900 px-2 py-0.5 rounded border border-slate-800"
               >
                 Clear Console
               </button>
+
+              <button
+                onClick={() => setIsLogsMinimized(!isLogsMinimized)}
+                className="flex items-center gap-1 text-emerald-400 hover:text-white transition text-[10px] font-bold bg-slate-900 hover:bg-slate-800 px-2.5 py-0.5 rounded border border-emerald-500/40"
+                title={isLogsMinimized ? "Mở rộng console log" : "Thu gọn console log"}
+              >
+                {isLogsMinimized ? (
+                  <>
+                    <ChevronUp className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Hiện Shell</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Ẩn Shell</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
           {/* Logs Output list */}
-          <div className="h-16 overflow-y-auto font-mono text-[10px] leading-relaxed flex flex-col gap-1 py-1 scrollbar-thin">
-            {logs.length === 0 ? (
-              <div className="text-slate-600 text-center italic py-2">
-                -- [Chưa có câu lệnh nào được thực thi. Hãy thử bấm thích bài viết, bình luận hoặc chạy Query Lab bên trên!] --
-              </div>
-            ) : (
-              logs.map((log) => (
-                <div key={log.id} className="flex items-start gap-2 border-b border-slate-900/40 pb-1">
-                  <span className="text-slate-500 shrink-0 font-bold">[{log.timestamp}]</span>
-                  <div className="flex-grow text-emerald-300">
-                    <pre className="whitespace-pre-wrap">{log.operation}</pre>
-                  </div>
-                  <div className="shrink-0 flex items-center gap-2 font-mono text-[9px]">
-                    <span className="text-slate-500">records: {log.resultCount}</span>
-                    <span className="text-yellow-500 font-bold bg-yellow-950/20 px-1 rounded border border-yellow-500/10">{log.executionTimeMs}ms</span>
-                  </div>
+          {!isLogsMinimized && (
+            <div className="h-16 overflow-y-auto font-mono text-[10px] leading-relaxed flex flex-col gap-1 py-1 scrollbar-thin animate-fade-in">
+              {logs.length === 0 ? (
+                <div className="text-slate-600 text-center italic py-2">
+                  -- [Chưa có câu lệnh nào được thực thi. Hãy thử bấm thích bài viết, bình luận hoặc chạy Query Lab bên trên!] --
                 </div>
-              ))
-            )}
-          </div>
+              ) : (
+                logs.map((log) => (
+                  <div key={log.id} className="flex items-start gap-2 border-b border-slate-900/40 pb-1">
+                    <span className="text-slate-500 shrink-0 font-bold">[{log.timestamp}]</span>
+                    <div className="flex-grow text-emerald-300">
+                      <pre className="whitespace-pre-wrap">{log.operation}</pre>
+                    </div>
+                    <div className="shrink-0 flex items-center gap-2 font-mono text-[9px]">
+                      <span className="text-slate-500">records: {log.resultCount}</span>
+                      <span className="text-yellow-500 font-bold bg-yellow-950/20 px-1 rounded border border-yellow-500/10">{log.executionTimeMs}ms</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </footer>
 
