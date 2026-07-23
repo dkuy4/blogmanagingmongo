@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import dotenv from "dotenv";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { MongoClient, ObjectId } from "mongodb";
 import { getMockPosts } from "./src/data/mockPosts.js";
@@ -787,6 +786,7 @@ Hãy trả về kết quả dưới dạng JSON có cấu trúc chính xác sau:
 // Serve frontend with Vite middleware
 async function setupServer() {
   if (process.env.NODE_ENV !== "production" && !process.env.VERCEL) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
