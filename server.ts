@@ -3,7 +3,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
 import { MongoClient, ObjectId } from "mongodb";
-import { getMockPosts } from "./src/data/mockPosts.js";
+import { getMockPosts, initialAuthors } from "./src/data/mockPosts.js";
 
 dotenv.config();
 
@@ -37,6 +37,15 @@ async function connectToMongo() {
         console.log(`[MongoDB] Connected successfully to ${mongoUri}`);
         
         const db = mongoClient.db(dbName);
+
+        // Populate Authors collection if empty
+        const authorsCollection = db.collection("Authors");
+        const authorCount = await authorsCollection.countDocuments();
+        if (authorCount === 0) {
+          console.log("[MongoDB] Authors collection is empty. Populating 3 initial authors...");
+          await authorsCollection.insertMany(initialAuthors as any);
+        }
+
         const collection = db.collection("Posts");
         
         // Create text index for full-text search
@@ -50,7 +59,14 @@ async function connectToMongo() {
         if (count === 0) {
           console.log("[MongoDB] Posts collection is empty. Populating with 52 mock posts...");
           const mockPosts = getMockPosts();
-          await collection.insertMany(mockPosts as any);
+          const postsToInsert = mockPosts.map(p => {
+            const { author, ...rest } = p;
+            return {
+              ...rest,
+              authorId: p.authorId || p.author?.userId || initialAuthors[0].userId
+            };
+          });
+          await collection.insertMany(postsToInsert as any);
           console.log(`[MongoDB] Successfully populated database with ${mockPosts.length} mock posts.`);
         }
       } catch (error) {
@@ -128,10 +144,21 @@ app.post("/api/reset-db", async (req, res) => {
   const start = performance.now();
   try {
     const mockPosts = getMockPosts();
-    const shellCommand = `db.Posts.drop();\ndb.createCollection("Posts");\ndb.Posts.insertMany([...${mockPosts.length} documents...]);`;
+    const shellCommand = `db.Authors.drop();
+db.createCollection("Authors");
+db.Authors.insertMany([...${initialAuthors.length} authors...]);
+db.Posts.drop();
+db.createCollection("Posts");
+db.Posts.insertMany([...${mockPosts.length} documents with authorId...]);`;
     
     if (isMongoConnected && mongoClient) {
       const db = mongoClient.db(dbName);
+      
+      // Reset Authors collection
+      await db.collection("Authors").drop().catch(() => {});
+      await db.collection("Authors").insertMany(initialAuthors as any);
+
+      // Reset Posts collection
       await db.collection("Posts").drop().catch(() => {});
       
       // Re-create text index
@@ -140,7 +167,15 @@ app.post("/api/reset-db", async (req, res) => {
         { weights: { title: 10, excerpt: 3, content: 1 }, name: "TextIndex" }
       );
       
-      await db.collection("Posts").insertMany(mockPosts as any);
+      const postsToInsert = mockPosts.map(p => {
+        const { author, ...rest } = p;
+        return {
+          ...rest,
+          authorId: p.authorId || p.author?.userId || initialAuthors[0].userId
+        };
+      });
+      
+      await db.collection("Posts").insertMany(postsToInsert as any);
       const end = performance.now();
       const execTime = Math.max(1, Math.round(end - start));
       
@@ -166,7 +201,22 @@ app.post("/api/reset-db", async (req, res) => {
   }
 });
 
-// 3. Get all posts or filtered posts
+// Endpoint to fetch authors
+app.get("/api/authors", async (req, res) => {
+  try {
+    if (isMongoConnected && mongoClient) {
+      const db = mongoClient.db(dbName);
+      const authors = await db.collection("Authors").find({}).toArray();
+      res.json(authors);
+    } else {
+      res.json(initialAuthors);
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// 3. Get all posts or filtered posts (with $lookup from Authors collection)
 app.get("/api/posts", async (req, res) => {
   try {
     if (isMongoConnected && mongoClient) {
@@ -181,7 +231,31 @@ app.get("/api/posts", async (req, res) => {
         filter.status = req.query.status;
       }
       
-      const posts = await db.collection("Posts").find(filter).toArray();
+      const pipeline: any[] = [];
+      if (Object.keys(filter).length > 0) {
+        pipeline.push({ $match: filter });
+      }
+      
+      pipeline.push(
+        {
+          $lookup: {
+            from: "Authors",
+            localField: "authorId",
+            foreignField: "userId",
+            as: "authorDetails"
+          }
+        },
+        {
+          $addFields: {
+            author: { $arrayElemAt: ["$authorDetails", 0] }
+          }
+        },
+        {
+          $project: { authorDetails: 0 }
+        }
+      );
+      
+      const posts = await db.collection("Posts").aggregate(pipeline).toArray();
       res.json(posts);
     } else {
       // In-memory fallback filtering
@@ -199,45 +273,55 @@ app.get("/api/posts", async (req, res) => {
   }
 });
 
-// 4. Create new post (InsertOne)
+// 4. Create new post (InsertOne storing authorId)
 app.post("/api/posts", async (req, res) => {
   const start = performance.now();
   try {
     const postData = req.body;
-    const newPost = {
+    const authorObj = postData.author || initialAuthors.find(a => a.userId === postData.authorId) || initialAuthors[0];
+    const authorId = postData.authorId || authorObj.userId;
+
+    const newPostDoc: any = {
       ...postData,
       _id: new ObjectId().toString(),
+      authorId,
       createdAt: new Date().toISOString(),
       metrics: { views: 1, likes: 0, shares: 0 },
       recent_comments: []
     };
-    
+    delete newPostDoc.author; // Clean embedded author object to store authorId reference only
+
     const shellCommand = `db.Posts.insertOne({
-  title: "${newPost.title}",
-  slug: "${newPost.slug}",
+  title: "${newPostDoc.title}",
+  slug: "${newPostDoc.slug}",
   content: "...", // Content truncated
-  status: "${newPost.status}",
+  status: "${newPostDoc.status}",
   createdAt: new Date(),
-  author: { name: "${newPost.author.name}" },
-  category: { name: "${newPost.category.name}" },
-  tags: ${JSON.stringify(newPost.tags)}
+  authorId: "${authorId}", // Reference to Authors collection
+  category: { name: "${newPostDoc.category.name}" },
+  tags: ${JSON.stringify(newPostDoc.tags)}
 });`;
+
+    const responsePost = {
+      ...newPostDoc,
+      author: authorObj
+    };
 
     if (isMongoConnected && mongoClient) {
       const db = mongoClient.db(dbName);
-      await db.collection("Posts").insertOne(newPost);
+      await db.collection("Posts").insertOne(newPostDoc);
       const end = performance.now();
       const execTime = Math.max(1, Math.round(end - start));
       
       res.json({
         success: true,
-        post: newPost,
+        post: responsePost,
         shellCommand,
         executionTimeMs: execTime
       });
     } else {
       const posts = getLocalPosts();
-      posts.unshift(newPost);
+      posts.unshift(responsePost as any);
       saveLocalPosts(posts);
       
       const end = performance.now();
@@ -245,7 +329,7 @@ app.post("/api/posts", async (req, res) => {
       
       res.json({
         success: true,
-        post: newPost,
+        post: responsePost,
         shellCommand,
         executionTimeMs: execTime
       });
@@ -397,38 +481,64 @@ app.post("/api/posts/:slug/comments", async (req, res) => {
   }
 });
 
-// 7. Q1: Complex Read Find
+// 7. Q1: Complex Read Find with $lookup from Authors collection
 app.get("/api/queries/q1", async (req, res) => {
   const start = performance.now();
   try {
     const categoryName = (req.query.category as string) || "Database";
     const limit = parseInt(req.query.limit as string) || 5;
     
-    const shellCommand = `db.Posts.find(
-  { status: "published", "category.name": "${categoryName}" },
-  { title: 1, slug: 1, "author.name": 1, metrics: 1, createdAt: 1, _id: 0 }
-).sort({ createdAt: -1 })
- .limit(${limit});`;
+    const shellCommand = `db.Posts.aggregate([
+  { $match: { status: "published", "category.name": "${categoryName}" } },
+  { 
+    $lookup: { 
+      from: "Authors", 
+      localField: "authorId", 
+      foreignField: "userId", 
+      as: "author" 
+    } 
+  },
+  { $unwind: "$author" },
+  { 
+    $project: { 
+      title: 1, 
+      slug: 1, 
+      "author.name": 1, 
+      metrics: 1, 
+      createdAt: 1, 
+      _id: 0 
+    } 
+  },
+  { $sort: { createdAt: -1 } },
+  { $limit: ${limit} }
+]);`;
 
     if (isMongoConnected && mongoClient) {
       const db = mongoClient.db(dbName);
-      const results = await db.collection("Posts")
-        .find(
-          { status: "published", "category.name": categoryName },
-          {
-            projection: {
-              title: 1,
-              slug: 1,
-              "author.name": 1,
-              metrics: 1,
-              createdAt: 1,
-              _id: 0
-            }
+      const results = await db.collection("Posts").aggregate([
+        { $match: { status: "published", "category.name": categoryName } },
+        {
+          $lookup: {
+            from: "Authors",
+            localField: "authorId",
+            foreignField: "userId",
+            as: "author"
           }
-        )
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .toArray();
+        },
+        { $unwind: "$author" },
+        {
+          $project: {
+            title: 1,
+            slug: 1,
+            "author.name": 1,
+            metrics: 1,
+            createdAt: 1,
+            _id: 0
+          }
+        },
+        { $sort: { createdAt: -1 } },
+        { $limit: limit }
+      ]).toArray();
         
       const end = performance.now();
       const execTime = Math.max(1, Math.round(end - start));
@@ -446,7 +556,7 @@ app.get("/api/queries/q1", async (req, res) => {
       const projected = limited.map(p => ({
         title: p.title,
         slug: p.slug,
-        "author.name": p.author.name,
+        "author.name": p.author?.name || 'Trần Quang Mạnh',
         metrics: p.metrics,
         createdAt: p.createdAt
       }));

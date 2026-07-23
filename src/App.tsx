@@ -245,6 +245,7 @@ export default function App() {
       excerpt: newExcerpt,
       content: newContent,
       status: newStatus,
+      authorId: authorObj.userId,
       author: authorObj,
       category: {
         categoryId: generateObjectId(),
