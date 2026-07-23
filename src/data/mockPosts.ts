@@ -62,7 +62,6 @@ export function getMockPosts(): PostDocument[] {
     `,
     status: 'published',
     createdAt: new Date('2026-07-15T08:00:00Z').toISOString(),
-    authorId: initialAuthors[0].userId,
     author: initialAuthors[0], // Duy Khang
     category: initialCategories[0], // Database
     tags: ['NoSQL', 'MongoDB', 'Schema Design', 'Tech'],
@@ -108,7 +107,6 @@ export function getMockPosts(): PostDocument[] {
     `,
     status: 'published',
     createdAt: new Date('2026-07-16T12:30:00Z').toISOString(),
-    authorId: initialAuthors[0].userId,
     author: initialAuthors[0], // Duy Khang
     category: initialCategories[0], // Database
     tags: ['Big Data', 'Performance', 'MongoDB', 'NoSQL'],
@@ -158,7 +156,6 @@ function initializeModule() {
       `,
       status: i % 10 === 0 ? 'draft' : 'published', // Make every 10th post a draft to showcase draft deletion (Query 5)
       createdAt: creationDate.toISOString(),
-      authorId: author.userId,
       author: author,
       category: {
         categoryId: generateObjectId(), // Creates a unique Category ID to represent standard mongo document behavior

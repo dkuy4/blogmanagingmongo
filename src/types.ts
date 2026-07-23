@@ -35,8 +35,7 @@ export interface PostDocument {
   excerpt: string;
   status: 'published' | 'draft';
   createdAt: string; // ISO Date String
-  authorId: string; // Reference to Authors collection (userId)
-  author: Author; // Populated Author object
+  author: Author;
   category: Category;
   tags: string[];
   metrics: Metrics;

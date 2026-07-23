@@ -146,9 +146,7 @@ export default function App() {
   const handleViewPost = async (post: PostDocument) => {
     const res = await runQuery2_AtomicUpdateMetric(post.slug, 'views');
     await refreshDatabaseState();
-    const authorObj = post.author || initialAuthors.find(a => a.userId === post.authorId) || initialAuthors[0];
-    const updatedPost = res.post ? { ...res.post, author: res.post.author || authorObj } : { ...post, author: authorObj };
-    setSelectedPost(updatedPost);
+    setSelectedPost(res.post);
     // Auto populate comment author name
     setCommentName('');
     setCommentText('');
@@ -160,8 +158,7 @@ export default function App() {
     const res = await runQuery2_AtomicUpdateMetric(slug, 'likes');
     await refreshDatabaseState();
     if (selectedPost && selectedPost.slug === slug) {
-      const authorObj = selectedPost.author || initialAuthors.find(a => a.userId === selectedPost.authorId) || initialAuthors[0];
-      setSelectedPost(res.post ? { ...res.post, author: res.post.author || authorObj } : selectedPost);
+      setSelectedPost(res.post);
     }
     showToast("Đã thích bài viết! (Thực thi $inc nguyên tử)", "success");
   };
@@ -171,8 +168,7 @@ export default function App() {
     const res = await runQuery2_AtomicUpdateMetric(slug, 'shares');
     await refreshDatabaseState();
     if (selectedPost && selectedPost.slug === slug) {
-      const authorObj = selectedPost.author || initialAuthors.find(a => a.userId === selectedPost.authorId) || initialAuthors[0];
-      setSelectedPost(res.post ? { ...res.post, author: res.post.author || authorObj } : selectedPost);
+      setSelectedPost(res.post);
     }
     showToast("Đã tăng lượt chia sẻ! (Thực thi $inc nguyên tử)", "info");
   };
@@ -184,10 +180,7 @@ export default function App() {
 
     const res = await runQuery3_AddComment(slug, commentName, commentText);
     await refreshDatabaseState();
-    if (res.post && selectedPost) {
-      const authorObj = selectedPost.author || initialAuthors.find(a => a.userId === selectedPost.authorId) || initialAuthors[0];
-      setSelectedPost({ ...res.post, author: res.post.author || authorObj });
-    }
+    setSelectedPost(res.post);
     setCommentText('');
     setCommentSubmitted(true);
     showToast("Đã gửi bình luận! (Thêm mới $push và giới hạn $slice: -20)", "success");
@@ -252,7 +245,6 @@ export default function App() {
       excerpt: newExcerpt,
       content: newContent,
       status: newStatus,
-      authorId: authorObj.userId,
       author: authorObj,
       category: {
         categoryId: generateObjectId(),
@@ -889,11 +881,10 @@ export default function App() {
   "excerpt": "${selectedPost.excerpt.slice(0, 30)}...",
   "status": "${selectedPost.status}",
   "createdAt": ISODate("${selectedPost.createdAt}"),
-  "authorId": ObjectId("${selectedPost.authorId || selectedPost.author?.userId || initialAuthors[0].userId}"),
   "author": {
-    "userId": ObjectId("${selectedPost.author?.userId || selectedPost.authorId || initialAuthors[0].userId}"),
-    "name": "${selectedPost.author?.name || 'Trần Quang Mạnh'}",
-    "avatarUrl": "${(selectedPost.author?.avatarUrl || initialAuthors[0].avatarUrl).slice(0, 15)}..."
+    "userId": ObjectId("${selectedPost.author.userId}"),
+    "name": "${selectedPost.author.name}",
+    "avatarUrl": "${selectedPost.author.avatarUrl.slice(0, 15)}..."
   },
   "category": {
     "categoryId": ObjectId("${selectedPost.category.categoryId}"),
