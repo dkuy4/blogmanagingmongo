@@ -362,6 +362,11 @@ app.post("/api/posts/:slug/metric", async (req, res) => {
         { $inc: { [`metrics.${metric}`]: 1 } },
         { returnDocument: "after" }
       );
+
+      if (result) {
+        const authorObj = await db.collection("Authors").findOne({ userId: result.authorId });
+        (result as any).author = authorObj || initialAuthors[0];
+      }
       
       const end = performance.now();
       const execTime = Math.max(1, Math.round(end - start));
@@ -445,6 +450,11 @@ app.post("/api/posts/:slug/comments", async (req, res) => {
         { returnDocument: "after" }
       );
       
+      if (result) {
+        const authorObj = await db.collection("Authors").findOne({ userId: result.authorId });
+        (result as any).author = authorObj || initialAuthors[0];
+      }
+
       const end = performance.now();
       const execTime = Math.max(1, Math.round(end - start));
       

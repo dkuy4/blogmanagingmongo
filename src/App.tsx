@@ -146,7 +146,9 @@ export default function App() {
   const handleViewPost = async (post: PostDocument) => {
     const res = await runQuery2_AtomicUpdateMetric(post.slug, 'views');
     await refreshDatabaseState();
-    setSelectedPost(res.post);
+    const authorObj = post.author || initialAuthors.find(a => a.userId === post.authorId) || initialAuthors[0];
+    const updatedPost = res.post ? { ...res.post, author: res.post.author || authorObj } : { ...post, author: authorObj };
+    setSelectedPost(updatedPost);
     // Auto populate comment author name
     setCommentName('');
     setCommentText('');
@@ -158,7 +160,8 @@ export default function App() {
     const res = await runQuery2_AtomicUpdateMetric(slug, 'likes');
     await refreshDatabaseState();
     if (selectedPost && selectedPost.slug === slug) {
-      setSelectedPost(res.post);
+      const authorObj = selectedPost.author || initialAuthors.find(a => a.userId === selectedPost.authorId) || initialAuthors[0];
+      setSelectedPost(res.post ? { ...res.post, author: res.post.author || authorObj } : selectedPost);
     }
     showToast("Đã thích bài viết! (Thực thi $inc nguyên tử)", "success");
   };
@@ -168,7 +171,8 @@ export default function App() {
     const res = await runQuery2_AtomicUpdateMetric(slug, 'shares');
     await refreshDatabaseState();
     if (selectedPost && selectedPost.slug === slug) {
-      setSelectedPost(res.post);
+      const authorObj = selectedPost.author || initialAuthors.find(a => a.userId === selectedPost.authorId) || initialAuthors[0];
+      setSelectedPost(res.post ? { ...res.post, author: res.post.author || authorObj } : selectedPost);
     }
     showToast("Đã tăng lượt chia sẻ! (Thực thi $inc nguyên tử)", "info");
   };
@@ -180,7 +184,10 @@ export default function App() {
 
     const res = await runQuery3_AddComment(slug, commentName, commentText);
     await refreshDatabaseState();
-    setSelectedPost(res.post);
+    if (res.post && selectedPost) {
+      const authorObj = selectedPost.author || initialAuthors.find(a => a.userId === selectedPost.authorId) || initialAuthors[0];
+      setSelectedPost({ ...res.post, author: res.post.author || authorObj });
+    }
     setCommentText('');
     setCommentSubmitted(true);
     showToast("Đã gửi bình luận! (Thêm mới $push và giới hạn $slice: -20)", "success");
@@ -572,14 +579,14 @@ export default function App() {
                     {/* Author card inside Post */}
                     <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
                       <img 
-                        src={selectedPost.author.avatarUrl} 
-                        alt={selectedPost.author.name}
+                        src={selectedPost.author?.avatarUrl || initialAuthors[0].avatarUrl} 
+                        alt={selectedPost.author?.name || 'Trần Quang Mạnh'}
                         referrerPolicy="no-referrer"
                         className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500/30"
                       />
                       <div>
-                        <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Tác giả (Embedded)</p>
-                        <p className="text-sm font-bold text-slate-800">{selectedPost.author.name}</p>
+                        <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Tác giả (Referenced)</p>
+                        <p className="text-sm font-bold text-slate-800">{selectedPost.author?.name || 'Trần Quang Mạnh'}</p>
                       </div>
                     </div>
 
@@ -789,7 +796,7 @@ export default function App() {
                             <div className="bg-slate-50 px-5 py-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400 font-mono">
                               <span className="flex items-center gap-1">
                                 <User className="w-3 h-3 text-slate-400" />
-                                {post.author.name}
+                                {post.author?.name || 'Tác giả'}
                               </span>
                               <span>
                                 {renderFormattedDate(post.createdAt)}
@@ -834,7 +841,7 @@ export default function App() {
                             <div className="bg-slate-50 px-5 py-3 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400 font-mono">
                               <span className="flex items-center gap-1">
                                 <User className="w-3 h-3 text-slate-400" />
-                                {post.author.name}
+                                {post.author?.name || 'Tác giả'}
                               </span>
                               <span>
                                 {renderFormattedDate(post.createdAt)}
@@ -882,10 +889,11 @@ export default function App() {
   "excerpt": "${selectedPost.excerpt.slice(0, 30)}...",
   "status": "${selectedPost.status}",
   "createdAt": ISODate("${selectedPost.createdAt}"),
+  "authorId": ObjectId("${selectedPost.authorId || selectedPost.author?.userId || initialAuthors[0].userId}"),
   "author": {
-    "userId": ObjectId("${selectedPost.author.userId}"),
-    "name": "${selectedPost.author.name}",
-    "avatarUrl": "${selectedPost.author.avatarUrl.slice(0, 15)}..."
+    "userId": ObjectId("${selectedPost.author?.userId || selectedPost.authorId || initialAuthors[0].userId}"),
+    "name": "${selectedPost.author?.name || 'Trần Quang Mạnh'}",
+    "avatarUrl": "${(selectedPost.author?.avatarUrl || initialAuthors[0].avatarUrl).slice(0, 15)}..."
   },
   "category": {
     "categoryId": ObjectId("${selectedPost.category.categoryId}"),
