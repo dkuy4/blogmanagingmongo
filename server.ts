@@ -293,7 +293,8 @@ app.post("/api/posts/:slug/metric", async (req, res) => {
       const posts = getLocalPosts();
       const index = posts.findIndex(p => p.slug === slug);
       if (index !== -1) {
-        posts[index].metrics[metric] += 1;
+        const mKey = metric as 'views' | 'likes' | 'shares';
+        posts[index].metrics[mKey] += 1;
         saveLocalPosts(posts);
       }
       const end = performance.now();
