@@ -49,8 +49,8 @@ export function getMockPosts(): PostDocument[] {
   "_id": ObjectId("64a1b2c3d4e5f6a1b2c3d4e5"),
   "title": "Tối ưu hóa Schema trong MongoDB",
   "author": {
-    "name": "Trần Quang Mạnh",
-    "avatarUrl": "/images/avatars/tqmanh.jpg"
+    "name": "Duy Khang",
+    "avatarUrl": "/images/avatars/dkhang.jpg"
   }
 }</code></pre>
 
@@ -63,7 +63,7 @@ export function getMockPosts(): PostDocument[] {
     status: 'published',
     createdAt: new Date('2026-07-15T08:00:00Z').toISOString(),
     authorId: initialAuthors[0].userId,
-    author: initialAuthors[0], // Trần Quang Mạnh
+    author: initialAuthors[0], // Duy Khang
     category: initialCategories[0], // Database
     tags: ['NoSQL', 'MongoDB', 'Schema Design', 'Tech'],
     metrics: {
@@ -74,13 +74,13 @@ export function getMockPosts(): PostDocument[] {
     recent_comments: [
       {
         commentId: '64d4e5f6g7h8i9d4e5f6g7h8',
-        userName: 'Nguyễn Khôi Nam',
+        userName: 'Nguyên Anh',
         text: 'Bài viết giải thích các pattern thiết kế rất chi tiết và dễ hiểu!',
         createdAt: new Date('2026-07-15T09:12:00Z').toISOString()
       },
       {
         commentId: '64e5f6g7h8i9j0e5f6g7h8i9',
-        userName: 'Nguyễn Tấn Kiệt',
+        userName: 'Chí Kiệt',
         text: 'Mình đang cần thông tin này cho đồ án tốt nghiệp khóa học cơ sở dữ liệu nâng cao.',
         createdAt: new Date('2026-07-15T10:05:00Z').toISOString()
       }
@@ -109,7 +109,7 @@ export function getMockPosts(): PostDocument[] {
     status: 'published',
     createdAt: new Date('2026-07-16T12:30:00Z').toISOString(),
     authorId: initialAuthors[0].userId,
-    author: initialAuthors[0], // Trần Quang Mạnh
+    author: initialAuthors[0], // Duy Khang
     category: initialCategories[0], // Database
     tags: ['Big Data', 'Performance', 'MongoDB', 'NoSQL'],
     metrics: {
