@@ -16,9 +16,9 @@ export function generateObjectId(): string {
 }
 
 export const initialAuthors: Author[] = [
-  { userId: '64b2c3d4e5f6g7b2c3d4e5f6', name: 'Trần Quang Mạnh', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80' },
-  { userId: '64b2c3d4e5f6g7b2c3d4e5f7', name: 'Nguyễn Khôi Nam', avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&h=150&q=80' },
-  { userId: '64b2c3d4e5f6g7b2c3d4e5f8', name: 'Nguyễn Tấn Kiệt', avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&h=150&q=80' }
+  { userId: '64b2c3d4e5f6g7b2c3d4e5f6', name: 'Duy Khang', avatarUrl: 'https://cdn2.fptshop.com.vn/unsafe/800x0/meme_capybara_6_9f7d9bd39c.jpg?auto=format&fit=crop&w=150&h=150&q=80' },
+  { userId: '64b2c3d4e5f6g7b2c3d4e5f7', name: 'Nguyên Anh', avatarUrl: 'https://avatarhub.edu.vn/wp-content/uploads/2026/01/capybara-meme-35.jpg?auto=format&fit=crop&w=150&h=150&q=80' },
+  { userId: '64b2c3d4e5f6g7b2c3d4e5f8', name: 'Chí Kiệt', avatarUrl: 'https://www.anhnghethuatdulich.com/wp-content/uploads/2025/07/meme_capybara_10_f065d6b6e9.jpg?auto=format&fit=crop&w=150&h=150&q=80' }
 ];
 
 export const initialCategories: Category[] = [
