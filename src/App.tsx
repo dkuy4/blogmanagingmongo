@@ -849,7 +849,7 @@ export default function App() {
             </div>
 
             {/* Right Column: Schema/BSON inspect panel representing Chapter 2 */}
-            <div className="flex flex-col gap-6 sticky top-6 self-start">
+            <div className="flex flex-col gap-6 sticky top-24 self-start">
               
               {/* Document Inspector Card */}
               <div className="bg-slate-900 text-white rounded-2xl shadow-xl border border-slate-800 p-5 flex flex-col gap-4">
