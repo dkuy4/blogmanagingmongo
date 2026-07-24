@@ -146,6 +146,21 @@ export async function runQuery3_AddComment(slug: string, userName: string, text:
   }
 }
 
+// Delete Comment ($pull)
+export async function runQuery_DeleteComment(slug: string, commentId: string): Promise<{ queryShell: string, post: PostDocument | null }> {
+  try {
+    const res = await fetch(`/api/posts/${slug}/comments/${commentId}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    logQuery(data.shellCommand, 1, data.executionTimeMs);
+    return { queryShell: data.shellCommand, post: data.post };
+  } catch (e) {
+    console.error("Error deleting comment:", e);
+    return { queryShell: '', post: null };
+  }
+}
+
 // Q4: Aggregation Pipeline (Group by category, count posts, sum views, avg likes, sort)
 export async function runQuery4_AggregationPipeline(): Promise<{ queryShell: string, results: AggregationResult[] }> {
   try {

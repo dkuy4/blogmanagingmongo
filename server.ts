@@ -469,6 +469,56 @@ app.post("/api/posts/:slug/comments", async (req, res) => {
   }
 });
 
+// 6.1 Delete comment (Subset Pattern: $pull)
+app.delete("/api/posts/:slug/comments/:commentId", async (req, res) => {
+  const start = performance.now();
+  try {
+    const { slug, commentId } = req.params;
+    
+    const shellCommand = `db.Posts.updateOne(
+  { slug: "${slug}" },
+  { $pull: { recent_comments: { commentId: "${commentId}" } } }
+);`;
+
+    if (isMongoConnected && mongoClient) {
+      const db = mongoClient.db(dbName);
+      const result = await db.collection("Posts").findOneAndUpdate(
+        { slug },
+        { $pull: { recent_comments: { commentId } } as any },
+        { returnDocument: "after" }
+      );
+      
+      const end = performance.now();
+      const execTime = Math.max(1, Math.round(end - start));
+      
+      res.json({
+        success: true,
+        post: result,
+        shellCommand,
+        executionTimeMs: execTime
+      });
+    } else {
+      const posts = getLocalPosts();
+      const index = posts.findIndex(p => p.slug === slug);
+      if (index !== -1) {
+        posts[index].recent_comments = posts[index].recent_comments.filter(c => c.commentId !== commentId);
+        saveLocalPosts(posts);
+      }
+      const end = performance.now();
+      const execTime = Math.max(1, Math.round(end - start));
+      
+      res.json({
+        success: true,
+        post: index !== -1 ? posts[index] : null,
+        shellCommand,
+        executionTimeMs: execTime
+      });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 7. Q1: Complex Read Find
 app.get("/api/queries/q1", async (req, res) => {
   const start = performance.now();

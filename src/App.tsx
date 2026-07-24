@@ -14,7 +14,7 @@ import {
 import { 
   loadPostsFromStorage, resetDatabase, loadLogsFromStorage, 
   clearLogs, runQuery1_ComplexFind, runQuery2_AtomicUpdateMetric, 
-  runQuery3_AddComment, runQuery4_AggregationPipeline, runQuery5_DeleteOldDrafts, 
+  runQuery3_AddComment, runQuery_DeleteComment, runQuery4_AggregationPipeline, runQuery5_DeleteOldDrafts, 
   runFullTextSearch, runQuery_InsertOne, getDbStatus, getUsersList, signUpUser
 } from './lib/mongoEngine';
 import { initialAuthors, initialCategories, initialUsers, generateObjectId } from './data/mockPosts';
@@ -279,14 +279,23 @@ export default function App() {
     e.preventDefault();
     if (!commentText.trim()) return;
 
-    const nameToUse = commentName.trim() || currentUser.fullName;
-    const res = await runQuery3_AddComment(slug, nameToUse, commentText, currentUser.userId, currentUser.avatarUrl);
+    const res = await runQuery3_AddComment(slug, currentUser.fullName, commentText, currentUser.userId, currentUser.avatarUrl);
     await refreshDatabaseState();
     setSelectedPost(res.post);
     setCommentText('');
     setCommentSubmitted(true);
     showToast("Đã gửi bình luận! (Thêm mới $push và giới hạn $slice: -20)", "success");
     setTimeout(() => setCommentSubmitted(false), 3000);
+  };
+
+  // Handle Delete Comment ($pull)
+  const handleDeleteComment = async (slug: string, commentId: string) => {
+    const res = await runQuery_DeleteComment(slug, commentId);
+    await refreshDatabaseState();
+    if (res.post) {
+      setSelectedPost(res.post);
+    }
+    showToast("Đã xóa bình luận! (Thực thi $pull nguyên tử)", "success");
   };
 
   // Full-text search handler (E2E Use Case)
@@ -883,34 +892,31 @@ export default function App() {
                       {/* Add Comment Form */}
                       <form onSubmit={(e) => handleAddComment(e, selectedPost.slug)} className="flex flex-col gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
                         <div className="flex items-center justify-between">
-                          <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                          <div className="flex items-center gap-2.5">
                             <img 
                               src={currentUser.avatarUrl} 
                               alt={currentUser.fullName}
-                              className="w-5 h-5 rounded-full object-cover border border-emerald-500"
+                              className="w-7 h-7 rounded-full object-cover border-2 border-emerald-500 shrink-0"
                             />
-                            <span>Bình luận với tài khoản <b>{currentUser.fullName}</b>:</span>
+                            <div className="flex flex-col">
+                              <span className="text-xs font-bold text-slate-800">{currentUser.fullName}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">Bình luận với tài khoản này</span>
+                            </div>
                           </div>
-                          <span className="text-[10px] text-slate-400 font-mono">userId: {currentUser.userId.slice(0, 8)}...</span>
+                          <span className="text-[10px] text-emerald-600 font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                            {currentUser.role}
+                          </span>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <input
-                            type="text"
-                            placeholder="Tên hiển thị..."
-                            value={commentName || currentUser.fullName}
-                            onChange={(e) => setCommentName(e.target.value)}
-                            className="md:col-span-1 px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
-                          />
-                          <input
-                            type="text"
-                            placeholder="Nhập nội dung bình luận tại đây..."
-                            required
-                            value={commentText}
-                            onChange={(e) => setCommentText(e.target.value)}
-                            className="md:col-span-2 px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
-                          />
-                        </div>
+                        <textarea
+                          placeholder="Nhập nội dung bình luận của bạn tại đây..."
+                          required
+                          rows={2}
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
+                        />
+
                         <div className="flex justify-between items-center mt-1">
                           {commentSubmitted ? (
                             <span className="text-xs text-emerald-600 font-bold flex items-center gap-1 animate-pulse">
@@ -935,7 +941,7 @@ export default function App() {
                           </div>
                         ) : (
                           selectedPost.recent_comments.map((comment) => (
-                            <div key={comment.commentId} className="bg-slate-50/50 hover:bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex gap-3 transition">
+                            <div key={comment.commentId} className="bg-slate-50/50 hover:bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex gap-3 transition group">
                               <img
                                 src={comment.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.userName)}&background=0D9488&color=fff`}
                                 alt={comment.userName}
@@ -951,9 +957,20 @@ export default function App() {
                                       </span>
                                     )}
                                   </div>
-                                  <span className="text-[10px] text-slate-400 font-mono">
-                                    {renderFormattedDate(comment.createdAt)}
-                                  </span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                      {renderFormattedDate(comment.createdAt)}
+                                    </span>
+                                    {(currentUser.role === 'admin' || (comment.userId && comment.userId === currentUser.userId)) && (
+                                      <button
+                                        onClick={() => handleDeleteComment(selectedPost.slug, comment.commentId)}
+                                        title="Xóa bình luận này (Thực thi $pull)"
+                                        className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 p-1 rounded-md transition"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                                 <p className="text-xs text-slate-600 leading-relaxed">{comment.text}</p>
                               </div>
