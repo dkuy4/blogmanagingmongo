@@ -577,7 +577,7 @@ export default function App() {
                         className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500/30"
                       />
                       <div>
-                        <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Tác giả (Referenced)</p>
+                        <p className="text-xs text-slate-400 font-mono uppercase tracking-wider">Tác giả (Embedded)</p>
                         <p className="text-sm font-bold text-slate-800">{selectedPost.author?.name || 'Trần Quang Mạnh'}</p>
                       </div>
                     </div>
