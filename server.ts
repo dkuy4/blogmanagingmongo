@@ -3,7 +3,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { GoogleGenAI, Type } from "@google/genai";
 import { MongoClient, ObjectId } from "mongodb";
-import { getMockPosts } from "./src/data/mockPosts.js";
+import { getMockPosts, initialUsers } from "./src/data/mockPosts.js";
 
 dotenv.config();
 
@@ -37,6 +37,15 @@ async function connectToMongo() {
         console.log(`[MongoDB] Connected successfully to ${mongoUri}`);
         
         const db = mongoClient.db(dbName);
+        
+        // Populate Users collection if empty
+        const usersCol = db.collection("Users");
+        const usersCount = await usersCol.countDocuments();
+        if (usersCount === 0) {
+          console.log("[MongoDB] Users collection is empty. Populating initial users...");
+          await usersCol.insertMany(initialUsers as any);
+        }
+
         const collection = db.collection("Posts");
         
         // Create text index for full-text search
@@ -128,10 +137,13 @@ app.post("/api/reset-db", async (req, res) => {
   const start = performance.now();
   try {
     const mockPosts = getMockPosts();
-    const shellCommand = `db.Posts.drop();\ndb.createCollection("Posts");\ndb.Posts.insertMany([...${mockPosts.length} documents...]);`;
+    const shellCommand = `db.Users.drop();\ndb.createCollection("Users");\ndb.Users.insertMany([...${initialUsers.length} users...]);\ndb.Posts.drop();\ndb.createCollection("Posts");\ndb.Posts.insertMany([...${mockPosts.length} documents...]);`;
     
     if (isMongoConnected && mongoClient) {
       const db = mongoClient.db(dbName);
+      await db.collection("Users").drop().catch(() => {});
+      await db.collection("Users").insertMany(initialUsers as any);
+
       await db.collection("Posts").drop().catch(() => {});
       
       // Re-create text index
@@ -160,6 +172,21 @@ app.post("/api/reset-db", async (req, res) => {
         shellCommand,
         executionTimeMs: execTime
       });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint to fetch users
+app.get("/api/users", async (req, res) => {
+  try {
+    if (isMongoConnected && mongoClient) {
+      const db = mongoClient.db(dbName);
+      const users = await db.collection("Users").find({}).toArray();
+      res.json(users);
+    } else {
+      res.json(initialUsers);
     }
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -316,13 +343,15 @@ app.post("/api/posts/:slug/comments", async (req, res) => {
   const start = performance.now();
   try {
     const { slug } = req.params;
-    const { userName, text } = req.body;
+    const { userId, userName, userAvatar, text } = req.body;
     
     const commentId = new ObjectId().toString();
     const createdAt = new Date().toISOString();
     const newComment = {
       commentId,
+      userId: userId || "64b2c3d4e5f6g7b2c3d4e5f9",
       userName: userName || "Khách viếng thăm",
+      userAvatar: userAvatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80",
       text,
       createdAt
     };
@@ -334,6 +363,7 @@ app.post("/api/posts/:slug/comments", async (req, res) => {
       recent_comments: { 
         $each: [{ 
           commentId: ObjectId("${commentId}"), 
+          userId: ObjectId("${newComment.userId}"),
           userName: "${newComment.userName}", 
           text: "${newComment.text}", 
           createdAt: ISODate("${createdAt}") 

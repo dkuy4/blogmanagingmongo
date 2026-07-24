@@ -3,6 +3,15 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export interface UserAccount {
+  userId: string;
+  username: string;
+  email: string;
+  fullName: string;
+  avatarUrl: string;
+  role: 'admin' | 'author' | 'reader';
+}
+
 export interface Author {
   userId: string;
   name: string;
@@ -16,7 +25,9 @@ export interface Category {
 
 export interface Comment {
   commentId: string;
+  userId?: string;
   userName: string;
+  userAvatar?: string;
   text: string;
   createdAt: string; // ISO Date String
 }

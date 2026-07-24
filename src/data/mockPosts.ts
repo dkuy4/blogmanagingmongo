@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { PostDocument, Author, Category } from '../types';
+import { PostDocument, Author, Category, UserAccount } from '../types';
 
 // Helper to simulate MongoDB ObjectId string
 export function generateObjectId(): string {
@@ -14,6 +14,13 @@ export function generateObjectId(): string {
   }
   return result;
 }
+
+export const initialUsers: UserAccount[] = [
+  { userId: '64b2c3d4e5f6g7b2c3d4e5f6', username: 'dkhang', email: 'dkhang@blog.vn', fullName: 'Duy Khang', avatarUrl: 'https://cdn2.fptshop.com.vn/unsafe/800x0/meme_capybara_6_9f7d9bd39c.jpg?auto=format&fit=crop&w=150&h=150&q=80', role: 'admin' },
+  { userId: '64b2c3d4e5f6g7b2c3d4e5f7', username: 'nguyenanh', email: 'nanh@blog.vn', fullName: 'Nguyên Anh', avatarUrl: 'https://avatarhub.edu.vn/wp-content/uploads/2026/01/capybara-meme-35.jpg?auto=format&fit=crop&w=150&h=150&q=80', role: 'author' },
+  { userId: '64b2c3d4e5f6g7b2c3d4e5f8', username: 'chijiet', email: 'ckiet@blog.vn', fullName: 'Chí Kiệt', avatarUrl: 'https://www.anhnghethuatdulich.com/wp-content/uploads/2025/07/meme_capybara_10_f065d6b6e9.jpg?auto=format&fit=crop&w=150&h=150&q=80', role: 'author' },
+  { userId: '64b2c3d4e5f6g7b2c3d4e5f9', username: 'reader01', email: 'reader01@gmail.com', fullName: 'Độc Giả Thường', avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80', role: 'reader' }
+];
 
 export const initialAuthors: Author[] = [
   { userId: '64b2c3d4e5f6g7b2c3d4e5f6', name: 'Duy Khang', avatarUrl: 'https://cdn2.fptshop.com.vn/unsafe/800x0/meme_capybara_6_9f7d9bd39c.jpg?auto=format&fit=crop&w=150&h=150&q=80' },

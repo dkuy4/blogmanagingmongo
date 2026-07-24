@@ -17,8 +17,8 @@ import {
   runQuery3_AddComment, runQuery4_AggregationPipeline, runQuery5_DeleteOldDrafts, 
   runFullTextSearch, runQuery_InsertOne, getDbStatus
 } from './lib/mongoEngine';
-import { initialAuthors, initialCategories, generateObjectId } from './data/mockPosts';
-import { PostDocument, Comment, QueryLog, AggregationResult } from './types';
+import { initialAuthors, initialCategories, initialUsers, generateObjectId } from './data/mockPosts';
+import { PostDocument, Comment, QueryLog, AggregationResult, UserAccount } from './types';
 
 export default function App() {
   // Database States
@@ -142,13 +142,16 @@ export default function App() {
     }
   };
 
+  // Logged-in User Account State
+  const [currentUser, setCurrentUser] = useState<UserAccount>(initialUsers[0]);
+
   // Handle article view (Atomic Increment Views - Q2)
   const handleViewPost = async (post: PostDocument) => {
     const res = await runQuery2_AtomicUpdateMetric(post.slug, 'views');
     await refreshDatabaseState();
     setSelectedPost(res.post);
     // Auto populate comment author name
-    setCommentName('');
+    setCommentName(currentUser.fullName);
     setCommentText('');
     setCommentSubmitted(false);
   };
@@ -178,7 +181,8 @@ export default function App() {
     e.preventDefault();
     if (!commentText.trim()) return;
 
-    const res = await runQuery3_AddComment(slug, commentName, commentText);
+    const nameToUse = commentName.trim() || currentUser.fullName;
+    const res = await runQuery3_AddComment(slug, nameToUse, commentText, currentUser.userId, currentUser.avatarUrl);
     await refreshDatabaseState();
     setSelectedPost(res.post);
     setCommentText('');
@@ -431,6 +435,35 @@ export default function App() {
               <span>So sánh & Schema</span>
             </button>
           </nav>
+
+          {/* Logged-in User Account Switcher */}
+          <div className="flex items-center gap-2.5 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700 shadow-sm shrink-0">
+            <img 
+              src={currentUser.avatarUrl} 
+              alt={currentUser.fullName}
+              className="w-7 h-7 rounded-full object-cover border-2 border-emerald-400"
+            />
+            <div className="flex flex-col">
+              <span className="text-[9px] text-slate-400 font-mono leading-none">Tài khoản đang đăng nhập:</span>
+              <select
+                value={currentUser.userId}
+                onChange={(e) => {
+                  const u = initialUsers.find(x => x.userId === e.target.value);
+                  if (u) {
+                    setCurrentUser(u);
+                    setCommentName(u.fullName);
+                  }
+                }}
+                className="bg-transparent text-xs font-bold text-emerald-400 focus:outline-none cursor-pointer mt-0.5"
+              >
+                {initialUsers.map(u => (
+                  <option key={u.userId} value={u.userId} className="bg-slate-900 text-white">
+                    {u.fullName} ({u.role})
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -669,12 +702,23 @@ export default function App() {
 
                       {/* Add Comment Form */}
                       <form onSubmit={(e) => handleAddComment(e, selectedPost.slug)} className="flex flex-col gap-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <div className="text-xs font-bold text-slate-600">Gửi bình luận mới:</div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs font-bold text-slate-700 flex items-center gap-2">
+                            <img 
+                              src={currentUser.avatarUrl} 
+                              alt={currentUser.fullName}
+                              className="w-5 h-5 rounded-full object-cover border border-emerald-500"
+                            />
+                            <span>Bình luận với tài khoản <b>{currentUser.fullName}</b>:</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-mono">userId: {currentUser.userId.slice(0, 8)}...</span>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <input
                             type="text"
-                            placeholder="Họ và tên của bạn..."
-                            value={commentName}
+                            placeholder="Tên hiển thị..."
+                            value={commentName || currentUser.fullName}
                             onChange={(e) => setCommentName(e.target.value)}
                             className="md:col-span-1 px-3 py-2 text-xs rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-white"
                           />
@@ -690,7 +734,7 @@ export default function App() {
                         <div className="flex justify-between items-center mt-1">
                           {commentSubmitted ? (
                             <span className="text-xs text-emerald-600 font-bold flex items-center gap-1 animate-pulse">
-                              <CheckCircle className="w-3.5 h-3.5" /> Gửi thành công!
+                              <CheckCircle className="w-3.5 h-3.5" /> Gửi bình luận thành công!
                             </span>
                           ) : <span />}
                           <button
@@ -712,12 +756,21 @@ export default function App() {
                         ) : (
                           selectedPost.recent_comments.map((comment) => (
                             <div key={comment.commentId} className="bg-slate-50/50 hover:bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex gap-3 transition">
-                              <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 font-bold flex items-center justify-center text-xs shrink-0 font-mono">
-                                {comment.userName.charAt(0).toUpperCase()}
-                              </div>
+                              <img
+                                src={comment.userAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.userName)}&background=0D9488&color=fff`}
+                                alt={comment.userName}
+                                className="w-8 h-8 rounded-full object-cover border border-emerald-500/30 shrink-0 mt-0.5"
+                              />
                               <div className="flex-grow flex flex-col gap-1">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs font-bold text-slate-800">{comment.userName}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-slate-800">{comment.userName}</span>
+                                    {comment.userId && (
+                                      <span className="text-[9px] text-emerald-600 font-mono bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                        ID: {comment.userId.slice(0, 6)}...
+                                      </span>
+                                    )}
+                                  </div>
                                   <span className="text-[10px] text-slate-400 font-mono">
                                     {renderFormattedDate(comment.createdAt)}
                                   </span>

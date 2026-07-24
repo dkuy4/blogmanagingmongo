@@ -127,14 +127,14 @@ export async function runQuery2_AtomicUpdateMetric(slug: string, metric: 'views'
 }
 
 // Q3: Subset Pattern Comment Push ($push with $slice)
-export async function runQuery3_AddComment(slug: string, userName: string, text: string): Promise<{ queryShell: string, comment: Comment, post: PostDocument | null }> {
+export async function runQuery3_AddComment(slug: string, userName: string, text: string, userId?: string, userAvatar?: string): Promise<{ queryShell: string, comment: Comment, post: PostDocument | null }> {
   try {
     const res = await fetch(`/api/posts/${slug}/comments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ userName, text })
+      body: JSON.stringify({ userId, userName, userAvatar, text })
     });
     const data = await res.json();
     logQuery(data.shellCommand, 1, data.executionTimeMs);
