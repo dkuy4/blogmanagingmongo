@@ -9,13 +9,13 @@ import {
   BarChart3, PlusCircle, RefreshCw, Compass, ThumbsUp, Share2, 
   MessageSquare, Calendar, User, Tag, ChevronRight, Info, FileText, 
   CheckCircle, AlertCircle, GitCompare, X, Send, Eye, ShieldAlert, ArrowRight,
-  ChevronDown, ChevronUp
+  ChevronDown, ChevronUp, UserCheck, UserPlus, LogIn, LogOut, Users as UsersIcon
 } from 'lucide-react';
 import { 
   loadPostsFromStorage, resetDatabase, loadLogsFromStorage, 
   clearLogs, runQuery1_ComplexFind, runQuery2_AtomicUpdateMetric, 
   runQuery3_AddComment, runQuery4_AggregationPipeline, runQuery5_DeleteOldDrafts, 
-  runFullTextSearch, runQuery_InsertOne, getDbStatus
+  runFullTextSearch, runQuery_InsertOne, getDbStatus, getUsersList, signUpUser
 } from './lib/mongoEngine';
 import { initialAuthors, initialCategories, initialUsers, generateObjectId } from './data/mockPosts';
 import { PostDocument, Comment, QueryLog, AggregationResult, UserAccount } from './types';
@@ -142,8 +142,106 @@ export default function App() {
     }
   };
 
-  // Logged-in User Account State
+  // Account & Auth States
+  const [usersList, setUsersList] = useState<UserAccount[]>(initialUsers);
   const [currentUser, setCurrentUser] = useState<UserAccount>(initialUsers[0]);
+  const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState<boolean>(false);
+  const [isAccountSwitchOpen, setIsAccountSwitchOpen] = useState<boolean>(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isSignUpModalOpen, setIsSignUpModalOpen] = useState<boolean>(false);
+
+  // Login Form State
+  const [loginIdentifier, setLoginIdentifier] = useState<string>('');
+  const [loginPassword, setLoginPassword] = useState<string>('');
+
+  // Sign Up Form State
+  const [signUpFullName, setSignUpFullName] = useState<string>('');
+  const [signUpUsername, setSignUpUsername] = useState<string>('');
+  const [signUpEmail, setSignUpEmail] = useState<string>('');
+  const [signUpPassword, setSignUpPassword] = useState<string>('');
+  const [signUpRole, setSignUpRole] = useState<'author' | 'reader'>('reader');
+
+  // Load Users list from DB
+  const refreshUsersList = async () => {
+    const uList = await getUsersList();
+    if (uList && uList.length > 0) {
+      setUsersList(uList);
+    }
+  };
+
+  // Auth Handlers
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginIdentifier.trim()) return;
+    const foundUser = usersList.find(u => 
+      u.username.toLowerCase() === loginIdentifier.toLowerCase() || 
+      u.email.toLowerCase() === loginIdentifier.toLowerCase() ||
+      u.fullName.toLowerCase() === loginIdentifier.toLowerCase()
+    );
+    if (foundUser) {
+      setCurrentUser(foundUser);
+      setCommentName(foundUser.fullName);
+      setIsLoginModalOpen(false);
+      setIsAccountDropdownOpen(false);
+      setLoginIdentifier('');
+      setLoginPassword('');
+      showToast(`Đăng nhập thành công! Chào mừng ${foundUser.fullName}`, "success");
+    } else {
+      showToast("Không tìm thấy tài khoản! Bạn có thể chọn 'Đăng ký tài khoản mới'.", "error");
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!signUpFullName.trim() || !signUpUsername.trim() || !signUpEmail.trim()) {
+      showToast("Vui lòng điền đầy đủ các trường thông tin!", "error");
+      return;
+    }
+    try {
+      const res = await signUpUser({
+        fullName: signUpFullName,
+        username: signUpUsername,
+        email: signUpEmail,
+        role: signUpRole
+      });
+      const newUser = res.user;
+      setUsersList(prev => [...prev, newUser]);
+      setCurrentUser(newUser);
+      setCommentName(newUser.fullName);
+      setIsSignUpModalOpen(false);
+      setIsAccountDropdownOpen(false);
+      setSignUpFullName('');
+      setSignUpUsername('');
+      setSignUpEmail('');
+      setSignUpPassword('');
+      showToast(`Đăng ký thành công! Đã đăng nhập với tài khoản ${newUser.fullName}`, "success");
+    } catch (err) {
+      showToast("Lỗi khi tạo tài khoản!", "error");
+    }
+  };
+
+  const handleSwitchUser = (user: UserAccount) => {
+    setCurrentUser(user);
+    setCommentName(user.fullName);
+    setIsAccountDropdownOpen(false);
+    setIsAccountSwitchOpen(false);
+    showToast(`Đã chuyển sang tài khoản: ${user.fullName} (${user.role})`, "info");
+  };
+
+  const handleLogout = () => {
+    const guestUser: UserAccount = {
+      userId: generateObjectId(),
+      username: 'guest',
+      email: 'guest@blog.vn',
+      fullName: 'Khách viếng thăm',
+      avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&h=150&q=80',
+      role: 'reader'
+    };
+    setCurrentUser(guestUser);
+    setCommentName('Khách viếng thăm');
+    setIsAccountDropdownOpen(false);
+    showToast("Đã đăng xuất khỏi tài khoản!", "info");
+  };
 
   // Handle article view (Atomic Increment Views - Q2)
   const handleViewPost = async (post: PostDocument) => {
@@ -388,81 +486,163 @@ export default function App() {
             </div>
           </div>
 
-          {/* Tab Selection */}
-          <nav className="flex bg-slate-800 p-1.5 rounded-xl border border-slate-700 w-full md:w-auto overflow-x-auto gap-1">
-            <button
-              onClick={() => { setActiveTab('reader'); setSelectedPost(null); }}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
-                activeTab === 'reader' 
-                  ? 'bg-emerald-600 text-white shadow-md' 
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <Compass className="w-4 h-4" />
-              <span>Trang chủ Blog</span>
-            </button>
-            <button
-              onClick={() => { setActiveTab('admin'); setSelectedPost(null); }}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
-                activeTab === 'admin' 
-                  ? 'bg-emerald-600 text-white shadow-md' 
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <Settings className="w-4 h-4" />
-              <span>Bàn làm việc Admin</span>
-            </button>
-            <button
-              onClick={() => { setActiveTab('queryLab'); setSelectedPost(null); }}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
-                activeTab === 'queryLab' 
-                  ? 'bg-emerald-600 text-white shadow-md' 
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <Terminal className="w-4 h-4" />
-              <span>MongoDB Query Lab</span>
-            </button>
-            <button
-              onClick={() => { setActiveTab('docs'); setSelectedPost(null); }}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
-                activeTab === 'docs' 
-                  ? 'bg-emerald-600 text-white shadow-md' 
-                  : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
-              }`}
-            >
-              <GitCompare className="w-4 h-4" />
-              <span>So sánh & Schema</span>
-            </button>
-          </nav>
-
-          {/* Logged-in User Account Switcher */}
-          <div className="flex items-center gap-2.5 bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700 shadow-sm shrink-0">
-            <img 
-              src={currentUser.avatarUrl} 
-              alt={currentUser.fullName}
-              className="w-7 h-7 rounded-full object-cover border-2 border-emerald-400"
-            />
-            <div className="flex flex-col">
-              <span className="text-[9px] text-slate-400 font-mono leading-none">Tài khoản đang đăng nhập:</span>
-              <select
-                value={currentUser.userId}
-                onChange={(e) => {
-                  const u = initialUsers.find(x => x.userId === e.target.value);
-                  if (u) {
-                    setCurrentUser(u);
-                    setCommentName(u.fullName);
-                  }
-                }}
-                className="bg-transparent text-xs font-bold text-emerald-400 focus:outline-none cursor-pointer mt-0.5"
+          {/* Right Area: Navigation Tabs (Aligned to original position) + Account Profile Dropdown */}
+          <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+            
+            {/* Tab Selection Navbar - Aligned to exact original left edge */}
+            <nav className="flex bg-slate-800 p-1.5 rounded-xl border border-slate-700 overflow-x-auto gap-1">
+              <button
+                onClick={() => { setActiveTab('reader'); setSelectedPost(null); }}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'reader' 
+                    ? 'bg-emerald-600 text-white shadow-md' 
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                }`}
               >
-                {initialUsers.map(u => (
-                  <option key={u.userId} value={u.userId} className="bg-slate-900 text-white">
-                    {u.fullName} ({u.role})
-                  </option>
-                ))}
-              </select>
+                <Compass className="w-4 h-4" />
+                <span>Trang chủ Blog</span>
+              </button>
+              <button
+                onClick={() => { setActiveTab('admin'); setSelectedPost(null); }}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'admin' 
+                    ? 'bg-emerald-600 text-white shadow-md' 
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                }`}
+              >
+                <Settings className="w-4 h-4" />
+                <span>Bàn làm việc Admin</span>
+              </button>
+              <button
+                onClick={() => { setActiveTab('queryLab'); setSelectedPost(null); }}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'queryLab' 
+                    ? 'bg-emerald-600 text-white shadow-md' 
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                }`}
+              >
+                <Terminal className="w-4 h-4" />
+                <span>MongoDB Query Lab</span>
+              </button>
+              <button
+                onClick={() => { setActiveTab('docs'); setSelectedPost(null); }}
+                className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'docs' 
+                    ? 'bg-emerald-600 text-white shadow-md' 
+                    : 'text-slate-300 hover:text-white hover:bg-slate-700/50'
+                }`}
+              >
+                <GitCompare className="w-4 h-4" />
+                <span>So sánh & Schema</span>
+              </button>
+            </nav>
+
+            {/* Profile Account Dropdown Button */}
+            <div className="relative">
+              <button
+                onClick={() => setIsAccountDropdownOpen(!isAccountDropdownOpen)}
+                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-xl border border-slate-700 hover:border-emerald-500/50 transition-all duration-200 shadow-md group shrink-0"
+              >
+                <img 
+                  src={currentUser.avatarUrl} 
+                  alt={currentUser.fullName}
+                  className="w-7 h-7 rounded-full object-cover border-2 border-emerald-400 group-hover:scale-105 transition"
+                />
+                <span className="text-xs font-bold hidden sm:inline text-slate-200 group-hover:text-white max-w-[90px] truncate">
+                  {currentUser.fullName}
+                </span>
+                <ChevronDown className="w-4 h-4 text-slate-400 group-hover:text-white transition" />
+              </button>
+
+              {/* Profile Dropdown Menu */}
+              {isAccountDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-72 bg-slate-900 text-white border border-slate-800 rounded-2xl shadow-2xl z-50 p-3 flex flex-col gap-2 animate-in fade-in slide-in-from-top-2 duration-150">
+                  {/* Current Account Card */}
+                  <div className="flex items-center gap-3 p-2.5 bg-slate-800/80 rounded-xl border border-slate-700/60">
+                    <img 
+                      src={currentUser.avatarUrl} 
+                      alt={currentUser.fullName}
+                      className="w-10 h-10 rounded-full object-cover border-2 border-emerald-500 shrink-0"
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-white truncate">{currentUser.fullName}</span>
+                        <span className="px-1.5 py-0.2 bg-emerald-950 text-emerald-400 border border-emerald-500/30 text-[9px] font-mono rounded">
+                          {currentUser.role}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono truncate">{currentUser.email}</span>
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-slate-800 my-0.5"></div>
+
+                  {/* Account Switcher List */}
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={() => setIsAccountSwitchOpen(!isAccountSwitchOpen)}
+                      className="flex items-center justify-between p-2 text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                    >
+                      <span className="flex items-center gap-2">
+                        <UserCheck className="w-4 h-4 text-emerald-400" />
+                        Chuyển tài khoản ({usersList.length})
+                      </span>
+                      {isAccountSwitchOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
+
+                    {isAccountSwitchOpen && (
+                      <div className="flex flex-col gap-1 pl-2 max-h-40 overflow-y-auto scrollbar-thin">
+                        {usersList.map((u) => (
+                          <button
+                            key={u.userId}
+                            onClick={() => handleSwitchUser(u)}
+                            className={`flex items-center justify-between p-1.5 rounded-lg text-xs transition ${
+                              currentUser.userId === u.userId 
+                                ? 'bg-emerald-950/60 text-emerald-300 font-bold border border-emerald-500/30' 
+                                : 'hover:bg-slate-800 text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <img src={u.avatarUrl} alt={u.fullName} className="w-5 h-5 rounded-full object-cover" />
+                              <span className="truncate">{u.fullName}</span>
+                            </div>
+                            <span className="text-[9px] font-mono text-slate-400 uppercase">{u.role}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="h-px bg-slate-800 my-0.5"></div>
+
+                  {/* Auth Action Buttons */}
+                  <button
+                    onClick={() => { setIsLoginModalOpen(true); setIsAccountDropdownOpen(false); }}
+                    className="flex items-center gap-2 p-2 text-xs font-medium text-slate-200 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                  >
+                    <LogIn className="w-4 h-4 text-emerald-400" />
+                    <span>Đăng nhập tài khoản</span>
+                  </button>
+
+                  <button
+                    onClick={() => { setIsSignUpModalOpen(true); setIsAccountDropdownOpen(false); }}
+                    className="flex items-center gap-2 p-2 text-xs font-medium text-slate-200 hover:text-white hover:bg-slate-800 rounded-lg transition"
+                  >
+                    <UserPlus className="w-4 h-4 text-emerald-400" />
+                    <span>Đăng ký tài khoản mới</span>
+                  </button>
+
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 p-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 rounded-lg transition"
+                  >
+                    <LogOut className="w-4 h-4 text-rose-400" />
+                    <span>Đăng xuất</span>
+                  </button>
+                </div>
+              )}
             </div>
+
           </div>
         </div>
       </header>
@@ -1677,6 +1857,157 @@ ${selectedPost.recent_comments.length > 2 ? `    ... // Thêm ${selectedPost.rec
           )}
         </div>
       </footer>
+
+      {/* LOGIN MODAL */}
+      {isLoginModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-800 w-full max-w-md p-6 flex flex-col gap-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <LogIn className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold">Đăng nhập tài khoản</h3>
+              </div>
+              <button 
+                onClick={() => setIsLoginModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleLogin} className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-300">Tên đăng nhập / Email / Họ tên</label>
+                <input 
+                  type="text" 
+                  placeholder="Nhập tên đăng nhập hoặc email..."
+                  required
+                  value={loginIdentifier}
+                  onChange={(e) => setLoginIdentifier(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-300">Mật khẩu</label>
+                <input 
+                  type="password" 
+                  placeholder="Nhập mật khẩu..."
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="text-[11px] text-slate-400 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800 leading-relaxed">
+                💡 <b>Mẹo đăng nhập nhanh:</b> Nhập một trong các tên mẫu: <b>Duy Khang</b>, <b>Nguyên Anh</b>, hoặc <b>Chí Kiệt</b>.
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsLoginModalOpen(false)}
+                  className="px-4 py-2 text-xs text-slate-400 hover:text-white rounded-xl transition"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg transition"
+                >
+                  Đăng nhập
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SIGN UP MODAL */}
+      {isSignUpModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-800 w-full max-w-md p-6 flex flex-col gap-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold">Đăng ký tài khoản mới</h3>
+              </div>
+              <button 
+                onClick={() => setIsSignUpModalOpen(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSignUp} className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-300">Họ và tên *</label>
+                <input 
+                  type="text" 
+                  placeholder="Ví dụ: Nguyễn Văn A"
+                  required
+                  value={signUpFullName}
+                  onChange={(e) => setSignUpFullName(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-300">Tên đăng nhập *</label>
+                <input 
+                  type="text" 
+                  placeholder="Ví dụ: nguyenvana"
+                  required
+                  value={signUpUsername}
+                  onChange={(e) => setSignUpUsername(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-300">Email *</label>
+                <input 
+                  type="email" 
+                  placeholder="nguyenvana@gmail.com"
+                  required
+                  value={signUpEmail}
+                  onChange={(e) => setSignUpEmail(e.target.value)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-slate-300">Vai trò trong hệ thống</label>
+                <select 
+                  value={signUpRole}
+                  onChange={(e) => setSignUpRole(e.target.value as any)}
+                  className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="reader">Độc giả (Viết bình luận, xem bài)</option>
+                  <option value="author">Tác giả (Được đăng bài mới)</option>
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setIsSignUpModalOpen(false)}
+                  className="px-4 py-2 text-xs text-slate-400 hover:text-white rounded-xl transition"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg transition"
+                >
+                  Tạo tài khoản
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );

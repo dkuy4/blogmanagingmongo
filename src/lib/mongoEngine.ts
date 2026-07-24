@@ -207,3 +207,35 @@ export async function runQuery_InsertOne(postData: Omit<PostDocument, '_id' | 'c
     throw e;
   }
 }
+
+// Fetch Users List
+export async function getUsersList(): Promise<any[]> {
+  try {
+    const res = await fetch('/api/users');
+    return await res.json();
+  } catch (e) {
+    console.error("Error fetching users:", e);
+    return [];
+  }
+}
+
+// Sign Up User
+export async function signUpUser(userData: { fullName: string, username: string, email: string, role?: string, avatarUrl?: string }): Promise<{ queryShell: string, user: any }> {
+  try {
+    const res = await fetch('/api/users/signup', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(userData)
+    });
+    const data = await res.json();
+    if (data.shellCommand) {
+      logQuery(data.shellCommand, 1, data.executionTimeMs || 1);
+    }
+    return { queryShell: data.shellCommand || '', user: data.user };
+  } catch (e) {
+    console.error("Error signing up user:", e);
+    throw e;
+  }
+}

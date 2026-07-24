@@ -193,6 +193,48 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
+// Endpoint to sign up new user
+app.post("/api/users/signup", async (req, res) => {
+  const start = performance.now();
+  try {
+    const { fullName, username, email, role, avatarUrl } = req.body;
+    const userId = new ObjectId().toString();
+    const newUser = {
+      userId,
+      username: username || email.split('@')[0],
+      email: email || `${username}@blog.vn`,
+      fullName: fullName || username,
+      avatarUrl: avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(fullName || username)}&background=0D9488&color=fff`,
+      role: role || 'reader'
+    };
+
+    const shellCommand = `db.Users.insertOne({
+  userId: ObjectId("${userId}"),
+  username: "${newUser.username}",
+  email: "${newUser.email}",
+  fullName: "${newUser.fullName}",
+  role: "${newUser.role}"
+});`;
+
+    if (isMongoConnected && mongoClient) {
+      const db = mongoClient.db(dbName);
+      await db.collection("Users").insertOne(newUser);
+    }
+    
+    const end = performance.now();
+    const execTime = Math.max(1, Math.round(end - start));
+
+    res.json({
+      success: true,
+      user: newUser,
+      shellCommand,
+      executionTimeMs: execTime
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // 3. Get all posts or filtered posts
 app.get("/api/posts", async (req, res) => {
   try {
