@@ -142,7 +142,6 @@ export function getMockPosts(): PostDocument[] {
     creationDate.setDate(creationDate.getDate() - i);
     
     samplePosts.push({
-      _id: generateObjectId(),
       title: `Bài viết chuyên sâu về ${category.name} phần ${i}`,
       slug: `bai-viet-chuyen-sau-${category.name.toLowerCase()}-${i}`,
       excerpt: `Đây là tóm tắt ngắn của bài viết số ${i}. Nội dung này tập trung phân tích các vấn đề và bài toán thực tế cốt lõi của chuyên mục ${category.name}.`,
@@ -165,9 +164,8 @@ function initializeModule() {
       createdAt: creationDate.toISOString(),
       author: author,
       category: {
-        categoryId: generateObjectId(), // Creates a unique Category ID to represent standard mongo document behavior
         name: category.name
-      },
+      } as Category,
       tags: [category.name, 'Tutorial', '2026', 'Advanced'],
       metrics: {
         views: Math.floor(Math.random() * 5000) + 100,
