@@ -9,7 +9,7 @@ import {
   BarChart3, PlusCircle, RefreshCw, Compass, ThumbsUp, Share2, 
   MessageSquare, Calendar, User, Tag, ChevronRight, Info, FileText, 
   CheckCircle, AlertCircle, GitCompare, X, Send, Eye, ShieldAlert, ArrowRight,
-  ChevronDown, ChevronUp, UserCheck, UserPlus, LogIn, LogOut, Users as UsersIcon
+  ChevronDown, ChevronUp, UserCheck, UserPlus, LogIn, LogOut, Users as UsersIcon, GripHorizontal
 } from 'lucide-react';
 import { 
   loadPostsFromStorage, resetDatabase, loadLogsFromStorage, 
@@ -27,6 +27,32 @@ export default function App() {
   const [selectedPost, setSelectedPost] = useState<PostDocument | null>(null);
   const [dbStatus, setDbStatus] = useState<{ connected: boolean, database: string, uri: string }>({ connected: false, database: '', uri: '' });
   const [isLogsMinimized, setIsLogsMinimized] = useState<boolean>(false);
+  const [logsHeight, setLogsHeight] = useState<number>(140);
+  const [isResizingLogs, setIsResizingLogs] = useState<boolean>(false);
+
+  // Drag-to-resize handler for Real-time Logs Console
+  const handleMouseDownResizeLogs = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsResizingLogs(true);
+    const startY = e.clientY;
+    const startHeight = logsHeight;
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const deltaY = startY - moveEvent.clientY;
+      const newHeight = Math.max(60, Math.min(650, startHeight + deltaY));
+      setLogsHeight(newHeight);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingLogs(false);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+  };
   
   // Navigation
   const [activeTab, setActiveTab] = useState<'reader' | 'admin' | 'queryLab' | 'docs'>('reader');
@@ -1799,7 +1825,24 @@ ${selectedPost.recent_comments.length > 2 ? `    ... // Thêm ${selectedPost.rec
       </main>
 
       {/* FLOATING LIVE MONGO TERMINAL LOGS */}
-      <footer className="fixed bottom-0 left-0 right-0 bg-slate-950 text-emerald-400 border-t border-emerald-500/30 z-30 shadow-2xl transition-all duration-300">
+      <footer className="fixed bottom-0 left-0 right-0 bg-slate-950 text-emerald-400 border-t border-emerald-500/30 z-30 shadow-2xl transition-all duration-150">
+        
+        {/* Top Drag Handle Bar */}
+        {!isLogsMinimized && (
+          <div 
+            onMouseDown={handleMouseDownResizeLogs}
+            className="w-full flex items-center justify-center py-1 cursor-ns-resize hover:bg-emerald-950/40 border-b border-slate-900 bg-slate-900/80 group select-none transition-colors"
+            title="Kéo giữ để thay đổi chiều cao Console"
+          >
+            <div className="flex items-center gap-1.5 text-slate-400 group-hover:text-emerald-400 font-mono transition-colors">
+              <GripHorizontal className="w-4 h-3 group-hover:scale-110 transition-transform" />
+              <span className="text-[9px] uppercase tracking-widest font-bold">
+                {isResizingLogs ? `Đang kéo chỉnh: ${logsHeight}px` : `Kéo lên/xuống để chỉnh chiều cao console (${logsHeight}px)`}
+              </span>
+            </div>
+          </div>
+        )}
+
         <div className="max-w-7xl mx-auto px-4 py-1.5">
           
           {/* Header click bar to toggle */}
@@ -1817,10 +1860,30 @@ ${selectedPost.recent_comments.length > 2 ? `    ... // Thêm ${selectedPost.rec
               </span>
             </div>
             
-            <div className="flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
-              <span className="hidden sm:inline text-[10px] text-slate-500 font-mono">
-                {isLogsMinimized ? 'Bấm để mở rộng console' : 'Ghi lại các lệnh Mongo shell thực thi dưới nền'}
-              </span>
+            <div className="flex items-center gap-2.5" onClick={(e) => e.stopPropagation()}>
+              {!isLogsMinimized && (
+                <div className="hidden md:flex items-center gap-1 border-r border-slate-800 pr-2">
+                  <span className="text-[9px] text-slate-500 font-mono mr-1">Cỡ nhanh:</span>
+                  <button
+                    onClick={() => setLogsHeight(120)}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition ${logsHeight === 120 ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'}`}
+                  >
+                    Vừa (120px)
+                  </button>
+                  <button
+                    onClick={() => setLogsHeight(260)}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition ${logsHeight === 260 ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'}`}
+                  >
+                    Lớn (260px)
+                  </button>
+                  <button
+                    onClick={() => setLogsHeight(450)}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-mono transition ${logsHeight === 450 ? 'bg-emerald-600 text-white font-bold' : 'bg-slate-900 text-slate-400 hover:text-white'}`}
+                  >
+                    Tối đa (450px)
+                  </button>
+                </div>
+              )}
               
               <button 
                 onClick={() => { clearLogs(); setLogs([]); showToast("Đã dọn dẹp bảng điều khiển log shell!", "info"); }}
@@ -1851,9 +1914,12 @@ ${selectedPost.recent_comments.length > 2 ? `    ... // Thêm ${selectedPost.rec
 
           {/* Logs Output list */}
           {!isLogsMinimized && (
-            <div className="h-16 overflow-y-auto font-mono text-[10px] leading-relaxed flex flex-col gap-1 py-1 scrollbar-thin animate-fade-in">
+            <div 
+              style={{ height: `${logsHeight}px` }}
+              className="overflow-y-auto font-mono text-[10px] leading-relaxed flex flex-col gap-1 py-1 scrollbar-thin animate-fade-in transition-[height] duration-75"
+            >
               {logs.length === 0 ? (
-                <div className="text-slate-600 text-center italic py-2">
+                <div className="text-slate-600 text-center italic py-4">
                   -- [Chưa có câu lệnh nào được thực thi. Hãy thử bấm thích bài viết, bình luận hoặc chạy Query Lab bên trên!] --
                 </div>
               ) : (
